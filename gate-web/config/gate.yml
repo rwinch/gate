@@ -75,6 +75,14 @@ hystrix:
     fetchGlobalAccounts:
       execution.isolation.thread.timeoutInMilliseconds: 2000
 
+logging:
+  level:
+    org:
+      springframework:
+        security:
+          web:
+            FilterChainProxy: DEBUG
+
 auth:
   anonymous:
     enabled: true # You likely want to disable this in production.

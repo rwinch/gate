@@ -16,12 +16,15 @@
 
 package com.netflix.spinnaker.gate.security.oauth2.client
 
-import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
+import org.springframework.cloud.security.oauth2.client.OAuth2ClientAutoConfiguration
+import org.springframework.cloud.security.oauth2.sso.EnableOAuth2Sso
 import org.springframework.context.annotation.Configuration
-import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails
+import org.springframework.context.annotation.Import
 
+@ConditionalOnExpression('${auth.oauth2Client.enabled:false}')
 @Configuration
-@ConfigurationProperties("auth.oauth2Client")
-class OAuth2ClientConfig extends AuthorizationCodeResourceDetails {
-  String userInfoUri
+@Import(OAuth2ClientAutoConfiguration)
+@EnableOAuth2Sso
+class OAuth2ClientConfig {
 }

@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration
 import org.springframework.boot.context.embedded.FilterRegistrationBean
+import org.springframework.cloud.security.oauth2.sso.EnableOAuth2Sso
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
@@ -32,6 +33,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter
 import org.springframework.security.core.userdetails.UserDetailsService
+import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilter
+import org.springframework.security.web.access.ExceptionTranslationFilter
 import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer
 
 import javax.servlet.Filter
@@ -62,6 +65,8 @@ class AuthConfig extends WebSecurityConfigurerAdapter {
           .antMatchers('/auth/**').permitAll()
           .antMatchers('/health').permitAll()
           .antMatchers('/**').authenticated()
+      .and()
+        .addFilterAfter(new OAuth2ClientContextFilter(), ExceptionTranslationFilter.class)
     }
   }
 
@@ -70,15 +75,6 @@ class AuthConfig extends WebSecurityConfigurerAdapter {
     webSecurityAugmentors.each {
       it.configure(auth)
     }
-  }
-
-  @Bean
-  public FilterRegistrationBean securityFilterChain(
-      @Qualifier(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME) Filter securityFilter) {
-    FilterRegistrationBean registration = new FilterRegistrationBean(securityFilter)
-    registration.setOrder(0)
-    registration.setName(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME)
-    return registration
   }
 
   static interface WebSecurityAugmentor {
