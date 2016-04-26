@@ -23,6 +23,8 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration
 import org.springframework.boot.context.embedded.FilterRegistrationBean
 import org.springframework.cloud.security.oauth2.sso.EnableOAuth2Sso
+import org.springframework.cloud.security.oauth2.sso.OAuth2SsoConfigurer
+import org.springframework.cloud.security.oauth2.sso.OAuth2SsoConfigurerAdapter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
@@ -45,9 +47,24 @@ import javax.servlet.Filter
 @Import(SecurityAutoConfiguration)
 @EnableOAuth2Sso
 @Slf4j
-class AuthConfig {
+class AuthConfig extends OAuth2SsoConfigurerAdapter {
 
-  
+  @Override
+  public  void match(OAuth2SsoConfigurer.RequestMatchers matchers) {
+    matchers.antMatchers('/**')
+  }
+
+  @Override
+  public void configure(HttpSecurity http) throws Exception {
+    http.csrf().disable()
+    http.authorizeRequests()
+            .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .antMatchers('/auth/**').permitAll()
+            .antMatchers('/health').permitAll()
+            .antMatchers('/**').authenticated()
+  }
+
+
   static interface WebSecurityAugmentor {
     void configure(AuthenticationManagerBuilder authenticationManagerBuilder)
 
