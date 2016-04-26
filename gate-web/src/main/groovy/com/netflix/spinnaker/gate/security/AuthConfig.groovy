@@ -45,51 +45,9 @@ import javax.servlet.Filter
 @Import(SecurityAutoConfiguration)
 @EnableOAuth2Sso
 @Slf4j
-class AuthConfig extends WebSecurityConfigurerAdapter {
+class AuthConfig {
 
-  @Autowired(required = false)
-  AnonymousConfig anonymousConfig
-
-  @Autowired(required = false)
-  Collection<WebSecurityAugmentor> webSecurityAugmentors = []
-
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
-    http.csrf().disable()
-
-//    webSecurityAugmentors.each {
-//      it.configure(http, userDetailsService(), authenticationManager())
-//    }
-
-//    if (!anonymousConfig?.enabled) {
-      http.authorizeRequests()
-          .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-          .antMatchers('/auth/**').permitAll()
-          .antMatchers('/health').permitAll()
-          .antMatchers('/**').authenticated()
-      .and()
-        .addFilterAfter(new OAuth2ClientContextFilter(), ExceptionTranslationFilter.class)
-//    }
-  }
-
-  @Primary
-  @Bean
-  public FilterRegistrationBean oauth2ClientFilterRegistration(
-      OAuth2ClientContextFilter filter) {
-    FilterRegistrationBean registration = new FilterRegistrationBean();
-    registration.setFilter(filter);
-    registration.setOrder(-110);
-    return registration;
-  }
-
-
-//  @Override
-//  protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-////    webSecurityAugmentors.each {
-////      it.configure(auth)
-////    }
-//  }
-
+  
   static interface WebSecurityAugmentor {
     void configure(AuthenticationManagerBuilder authenticationManagerBuilder)
 
