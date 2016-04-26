@@ -145,7 +145,7 @@ class GateConfig {
   private <T> T createClient(String serviceName, Class<T> type, OkHttpClient okHttpClient) {
     Service service = serviceConfiguration.getService(serviceName)
     if (service == null) {
-      throw new IllegalArgumentException("Unknown service ${serviceName} requested of type ${type}")
+      return null
     }
     if (!service.enabled) {
       return null
