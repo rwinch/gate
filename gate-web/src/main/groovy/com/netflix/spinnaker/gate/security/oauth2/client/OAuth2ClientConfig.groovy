@@ -21,10 +21,12 @@ import org.springframework.cloud.security.oauth2.client.OAuth2ClientAutoConfigur
 import org.springframework.cloud.security.oauth2.sso.EnableOAuth2Sso
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client
 
-@ConditionalOnExpression('${auth.oauth2Client.enabled:false}')
+//@ConditionalOnExpression('${auth.oauth2Client.enabled:false}')
 @Configuration
-@Import(OAuth2ClientAutoConfiguration)
-@EnableOAuth2Sso
+//@Import(OAuth2ClientAutoConfiguration)
+//@EnableOAuth2Client
+//@EnableOAuth2Sso
 class OAuth2ClientConfig {
 }

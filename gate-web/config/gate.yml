@@ -75,13 +75,18 @@ hystrix:
     fetchGlobalAccounts:
       execution.isolation.thread.timeoutInMilliseconds: 2000
 
+#logging:
+#  level:
+#    org:
+#      springframework:
+#        security:
+#          web:
+#            FilterChainProxy: DEBUG
+
 logging:
   level:
-    org:
-      springframework:
-        security:
-          web:
-            FilterChainProxy: DEBUG
+    org.springframework.security: DEBUG
+#    org.springframework.web: DEBUG
 
 auth:
   anonymous:
@@ -116,3 +121,5 @@ auth:
       firstName: User.FirstName
       lastName: User.LastName
       roles: memberOf
+
+#debug: true
