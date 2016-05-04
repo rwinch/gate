@@ -16,9 +16,8 @@
 
 package com.netflix.spinnaker.gate.security.saml
 
-import com.netflix.spinnaker.gate.config.Headers
-import com.netflix.spinnaker.gate.services.AnonymousAccountsService
 import com.netflix.spinnaker.gate.security.anonymous.AnonymousConfig
+import com.netflix.spinnaker.gate.services.AnonymousAccountsService
 import com.netflix.spinnaker.gate.services.internal.ClouddriverService
 import com.netflix.spinnaker.security.User
 import groovy.util.logging.Slf4j
@@ -31,21 +30,28 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.RememberMeServices
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestMethod
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
-import javax.ws.rs.core.Response
 
 @ConditionalOnExpression('${saml.enabled:false}')
+@RequestMapping("/saml")
+@RestController
 @Slf4j
-class SAMLLoginAuthenticator {
+class SAMLSecurityController {
+  private static final String SPINNAKER_SSO_CALLBACK_KEY = "_SPINNAKER_SSO_CALLBACK"
+
   private final String url
   private final String certificate
-  private final SAMLConfig.SAMLSecurityConfigProperties samlSecurityConfigProperties
+  private final SAMLSecurityConfig.SAMLSecurityConfigProperties samlSecurityConfigProperties
   private final ClouddriverService clouddriverService
 
   @Autowired
-  SAMLLoginAuthenticator(SAMLConfig.SAMLSecurityConfigProperties properties, ClouddriverService clouddriverService) {
+  SAMLSecurityController(SAMLSecurityConfig.SAMLSecurityConfigProperties properties, ClouddriverService clouddriverService) {
     this.url = properties.url
     this.certificate = properties.certificate
     this.samlSecurityConfigProperties = properties
@@ -61,37 +67,20 @@ class SAMLLoginAuthenticator {
   @Autowired
   AnonymousAccountsService anonymousAccountsService
 
-  boolean handleAuthSignIn(HttpServletRequest request, HttpServletResponse response) {
-    String samlResponse = request.getParameter("samlResponse")
-    if (!samlResponse) {
-      response.sendError(Response.Status.PRECONDITION_FAILED.statusCode, "Missing required samlResponse parameter.")
-      return false
-    }
+  @RequestMapping(method = RequestMethod.GET)
+  void get(
+      @RequestParam(value = "callback", required = false) String cb,
+      @RequestParam(value = "path", required = false) String hash,
+      HttpServletRequest request, HttpServletResponse response) {
 
-    def assertion = SAMLUtils.buildAssertion(samlResponse,
-                                             SAMLUtils.loadCertificate(samlSecurityConfigProperties.certificate))
-    def user = buildUser(assertion,
-                         samlSecurityConfigProperties.userAttributeMapping,
-                         anonymousAccountsService.getAllowedAccounts(),
-                         clouddriverService.getAccounts())
-    if (!hasRequiredRole(anonymousSecurityConfig, samlSecurityConfigProperties, user)) {
-      SecurityContextHolder.clearContext()
-      rememberMeServices.loginFail(request, response)
-      throw new BadCredentialsException("Credentials are bad")
-    }
-    def auth = new UsernamePasswordAuthenticationToken(user, "", [new SimpleGrantedAuthority("USER")])
-    SecurityContextHolder.context.authentication = auth
-    rememberMeServices.loginSuccess(request, response, auth)
+    def callback = cb && hash ? cb + '/#' + hash : cb
+    request.session.setAttribute(SPINNAKER_SSO_CALLBACK_KEY, callback)
 
-    return true
-  }
-
-  void handleAuth(HttpServletRequest request, HttpServletResponse response) {
     URL redirect
     if (samlSecurityConfigProperties.redirectBase) {
-      redirect = (samlSecurityConfigProperties.redirectBase + '/auth/signIn').toURI().normalize().toURL()
+      redirect = (samlSecurityConfigProperties.redirectBase + '/saml/signIn').toURI().normalize().toURL()
     } else {
-      redirect = new URL(request.scheme, request.serverName, request.serverPort, request.contextPath + '/auth/signIn')
+      redirect = new URL(request.scheme, request.serverName, request.serverPort, request.contextPath + '/saml/signIn')
     }
 
     def authnRequest = SAMLUtils.buildAuthnRequest(url, redirect, samlSecurityConfigProperties.issuerId)
@@ -106,8 +95,32 @@ class SAMLLoginAuthenticator {
     new HTTPRedirectDeflateEncoder().encode(context)
   }
 
+  @RequestMapping(value = "/signIn", method = RequestMethod.POST)
+  void signIn(@RequestParam("SAMLResponse") String samlResponse,
+              HttpServletRequest request,
+              HttpServletResponse response) {
+    def assertion = SAMLUtils.buildAssertion(samlResponse, SAMLUtils.loadCertificate(samlSecurityConfigProperties.certificate))
+    def user = buildUser(assertion, samlSecurityConfigProperties.userAttributeMapping, anonymousAccountsService.getAllowedAccounts(), clouddriverService.getAccounts())
+    if (!hasRequiredRole(anonymousSecurityConfig, samlSecurityConfigProperties, user)) {
+      SecurityContextHolder.clearContext()
+      rememberMeServices.loginFail(request, response)
+      throw new BadCredentialsException("Credentials are bad")
+    }
+    def auth = new UsernamePasswordAuthenticationToken(user, "", [new SimpleGrantedAuthority("USER")])
+    SecurityContextHolder.context.authentication = auth
+    rememberMeServices.loginSuccess(request, response, auth)
+
+    String callback = request.session.getAttribute(SPINNAKER_SSO_CALLBACK_KEY)
+    if (!callback) {
+      response.sendError(200, "ok")
+      return
+    }
+
+    response.sendRedirect callback
+  }
+
   static boolean hasRequiredRole(AnonymousConfig anonymousSecurityConfig,
-                                 SAMLConfig.SAMLSecurityConfigProperties samlSecurityConfigProperties,
+                                 SAMLSecurityConfig.SAMLSecurityConfigProperties samlSecurityConfigProperties,
                                  User user) {
     if (samlSecurityConfigProperties.requiredRoles) {
       // ensure the user has at least one of the required roles (and at least one allowed account)
@@ -124,18 +137,8 @@ class SAMLLoginAuthenticator {
     return user.allowedAccounts
   }
 
-  User handleAuthInfo(HttpServletRequest request, HttpServletResponse response) {
-    Object whoami = SecurityContextHolder.context.authentication.principal
-    if (!whoami || !(whoami instanceof User) || !(hasRequiredRole(anonymousSecurityConfig, samlSecurityConfigProperties, whoami))) {
-      response.addHeader Headers.AUTHENTICATION_REDIRECT_HEADER_NAME, "/auth"
-      response.sendError 401
-      return null
-    }
-    (User) whoami
-  }
-
   static User buildUser(Assertion assertion,
-                        SAMLConfig.UserAttributeMapping userAttributeMapping,
+                        SAMLSecurityConfig.UserAttributeMapping userAttributeMapping,
                         Collection<String> anonymousAllowedAccounts,
                         Collection<ClouddriverService.Account> allAccounts) {
     def attributes = SAMLUtils.extractAttributes(assertion)
@@ -156,11 +159,11 @@ class SAMLLoginAuthenticator {
     }
 
     def user = new User(
-      email: assertion.getSubject().nameID.value,
-      firstName: attributes[userAttributeMapping.firstName]?.get(0),
-      lastName: attributes[userAttributeMapping.lastName]?.get(0),
-      roles: roles,
-      allowedAccounts: allowedAccounts
+        email: assertion.getSubject().nameID.value,
+        firstName: attributes[userAttributeMapping.firstName]?.get(0),
+        lastName: attributes[userAttributeMapping.lastName]?.get(0),
+        roles: roles,
+        allowedAccounts: allowedAccounts
     )
 
     return user

@@ -70,14 +70,14 @@ class SAMLSecurityControllerSpec extends Specification {
     ].flatten() as List<ClouddriverService.Account>
 
     def assertion = SAMLUtils.buildAssertion(new String(new org.apache.commons.codec.binary.Base64().encode(samlResponse.bytes)))
-    def userAttributeMapping = new SAMLConfig.UserAttributeMapping(
+    def userAttributeMapping = new SAMLSecurityConfig.UserAttributeMapping(
       firstName: "givenName",
       lastName: "familyName",
       roles: "memberOf"
     )
 
     when:
-    def user = SAMLLoginAuthenticator.buildUser(
+    def user = SAMLSecurityController.buildUser(
       assertion, userAttributeMapping, allowedAnonymousAccounts, allAccounts
     )
 
@@ -99,13 +99,13 @@ class SAMLSecurityControllerSpec extends Specification {
   void "should check whether a user has a required role"() {
     given:
     def anonymousSecurityConfig = new AnonymousConfig()
-    def oneLoginSecurityConfig = new SAMLConfig.SAMLSecurityConfigProperties(
+    def oneLoginSecurityConfig = new SAMLSecurityConfig.SAMLSecurityConfigProperties(
       requiredRoles: requiredRoles
     )
     def user = new User(email: email, roles: roles, allowedAccounts: allowedAccounts)
 
     expect:
-    SAMLLoginAuthenticator.hasRequiredRole(anonymousSecurityConfig, oneLoginSecurityConfig, user) == hasRequiredRole
+    SAMLSecurityController.hasRequiredRole(anonymousSecurityConfig, oneLoginSecurityConfig, user) == hasRequiredRole
 
     where:
     email        | requiredRoles | roles    | allowedAccounts || hasRequiredRole

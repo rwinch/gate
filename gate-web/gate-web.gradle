@@ -10,6 +10,10 @@ tasks.withType(org.springframework.boot.gradle.run.BootRunTask) {
 apply plugin: 'spring-boot'
 apply plugin: 'nebula.ospackage'
 
+repositories {
+  mavenLocal()
+}
+
 dependencies {
   compile project(":gate-manual")
   compile project(":gate-core")
@@ -23,9 +27,11 @@ dependencies {
   compile spinnaker.dependency('cglib')
   compile('org.springframework.session:spring-session-data-redis:1.0.1.RELEASE')
   compile("org.springframework.cloud:spring-cloud-security:1.0.3.RELEASE")
+  compile('org.springframework.security.extensions:spring-security-saml2-core:1.0.2.RELEASE')
   compile('org.opensaml:opensaml:2.6.4')
   compile("com.google.api-client:google-api-client:1.21.0")
   compile("com.google.apis:google-api-services-admin-directory:directory_v1-rev65-1.21.0")
+  compile("git-java-okta-dsl:git-java-okta-dsl:1.0.0.BUILD-SNAPSHOT")
 
   testCompile "com.squareup.okhttp:mockwebserver:${spinnaker.version('okHttp')}"
 

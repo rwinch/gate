@@ -17,30 +17,39 @@
 package com.netflix.spinnaker.gate.security.saml
 
 import com.netflix.spinnaker.gate.security.AuthConfig
-
+import com.netflix.spinnaker.gate.security.SpinnakerAuthConfig
 import groovy.util.logging.Slf4j
 import org.opensaml.DefaultBootstrap
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
+import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.security.authentication.AuthenticationManager
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder
+import org.springframework.context.annotation.Import
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter
+import org.springframework.security.config.annotation.web.servlet.configuration.EnableWebMvcSecurity
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.web.authentication.RememberMeServices
 import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices
 import org.springframework.stereotype.Component
 
-@ConditionalOnExpression('${auth.saml.enabled:false}')
+import static com.example.dsl.OktaConfigurer.okta;
+
+@ConditionalOnExpression('${saml.enabled:false}')
 @Configuration
+@SpinnakerAuthConfig
+@EnableWebMvcSecurity
+@Import(SecurityAutoConfiguration)
 @Slf4j
-class SAMLConfig {
+class SAMLSecurityConfig extends WebSecurityConfigurerAdapter {
+
   @Component
-  @ConfigurationProperties("auth.saml")
+  @ConfigurationProperties("saml")
   static class SAMLSecurityConfigProperties {
     Boolean enabled
+    Boolean requireAuthentication
     String url
     String certificate
     String redirectBase
@@ -64,17 +73,29 @@ class SAMLConfig {
   @Autowired
   SAMLSecurityConfigProperties samlSecurityConfigProperties
 
-  void configure(HttpSecurity http,
-                 UserDetailsService userDetailsService,
-                 AuthenticationManager authenticationManager) {
-    org.opensaml.Configuration.validateJCEProviders()
-    DefaultBootstrap.bootstrap()
+  @Override
+  void configure(HttpSecurity http) {
+//    org.opensaml.Configuration.validateJCEProviders()
+//    DefaultBootstrap.bootstrap()
 
-    http.rememberMe().rememberMeServices(rememberMeServices(userDetailsService))
-  }
+    http.rememberMe().rememberMeServices(rememberMeServices(userDetailsService()))
 
-  void configure(AuthenticationManagerBuilder authenticationManagerBuilder) {
-    // do nothing
+    if (samlSecurityConfigProperties.requireAuthentication) {
+      AuthConfig.configure(http)
+    }
+
+    URL url = new URL(samlSecurityConfigProperties.url)
+
+    okta().keyStore()
+        .storeFilePath(samlSecurityConfigProperties.keyStore.absolutePath)
+        .password(samlSecurityConfigProperties.keyStorePassword)
+        .keyname(samlSecurityConfigProperties.keyStoreAliasName)
+        .keyPassword(samlSecurityConfigProperties.keyStorePassword)
+        .and()
+        .entityId(samlSecurityConfigProperties.issuerId)
+        .protocol(url.protocol)
+        .hostname(url.host)
+        .basePath(url.path)
   }
 
   @Bean
