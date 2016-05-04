@@ -31,7 +31,9 @@ dependencies {
   compile('org.opensaml:opensaml:2.6.4')
   compile("com.google.api-client:google-api-client:1.21.0")
   compile("com.google.apis:google-api-services-admin-directory:directory_v1-rev65-1.21.0")
-  compile("git-java-okta-dsl:git-java-okta-dsl:1.0.0.BUILD-SNAPSHOT")
+  compile("git-java-okta-dsl:git-java-okta-dsl:1.0.0.BUILD-SNAPSHOT") {
+  	exclude group: 'org.springframework.boot'
+  }
 
   testCompile "com.squareup.okhttp:mockwebserver:${spinnaker.version('okHttp')}"
 
